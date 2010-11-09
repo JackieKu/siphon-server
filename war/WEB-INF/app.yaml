@@ -1,0 +1,11 @@
+application: siphon-sync
+version: 1
+runtime: java
+
+handlers:
+  - url: /*
+    servlet: org.ku.siphon.SiphonServlet
+    secure: always
+
+system_properties:
+  java.util.logging.config.file: WEB-INF/logging.properties
