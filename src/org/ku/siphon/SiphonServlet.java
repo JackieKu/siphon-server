@@ -24,14 +24,22 @@ public class SiphonServlet extends HttpServlet {
 		@SuppressWarnings({ "unchecked", "deprecation" })
 		Map<String, String[]> query = HttpUtils.parseQueryString(req.getQueryString());
 
-		username = query.get("email")[0];
-		password = query.get("password")[0];
-
 		String type = query.get("type")[0];
-		request = req;
-		response = resp;
 		response.setCharacterEncoding("UTF-8");
 		response.setContentType("application/json");
+
+		// This is required to get the client work properly. :-(
+		if (!query.containsKey("email")
+			|| !query.containsKey("password")
+			|| (username = query.get("email")[0]).isEmpty()
+			|| (password = query.get("password")[0]).isEmpty())
+		{
+			response.getWriter().print("{\"retval\": 0}");
+			return;
+		}
+
+		request = req;
+		response = resp;
 
 		if (type.equals("get"))
 			handleGet();
