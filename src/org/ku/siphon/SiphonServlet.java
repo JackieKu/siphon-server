@@ -7,6 +7,8 @@ import java.util.logging.Logger;
 
 import javax.servlet.http.*;
 
+import com.google.appengine.api.datastore.EntityNotFoundException;
+
 @SuppressWarnings("serial")
 public class SiphonServlet extends HttpServlet {
 	private static final Logger log = Logger.getLogger(SiphonServlet.class.getName());
@@ -17,10 +19,20 @@ public class SiphonServlet extends HttpServlet {
 	private String password;
 	private User user;
 
+	private class AuthFailedException extends Exception {
+		private AuthFailedException(String message) {
+			super(message);
+		}
+	}
+
 	@Override
-	public void doGet(HttpServletRequest req, HttpServletResponse resp)
+	public void doPost(HttpServletRequest req, HttpServletResponse resp)
 		throws IOException
 	{
+		request = req;
+		response = resp;
+
+		// Why they can deprecate an API that is not full implemented in the new interface?
 		@SuppressWarnings({ "unchecked", "deprecation" })
 		Map<String, String[]> query = HttpUtils.parseQueryString(req.getQueryString());
 
@@ -29,58 +41,58 @@ public class SiphonServlet extends HttpServlet {
 		response.setContentType("application/json");
 
 		// This is required to get the client work properly. :-(
+		// The document doesn't say how to deal with empty email and password.
 		if (!query.containsKey("email")
 			|| !query.containsKey("password")
 			|| (username = query.get("email")[0]).isEmpty()
 			|| (password = query.get("password")[0]).isEmpty())
 		{
-			response.getWriter().print("{\"retval\": 0}");
+			success();
 			return;
 		}
 
-		request = req;
-		response = resp;
-
-		if (type.equals("get"))
-			handleGet();
-		else if (type.equals("set"))
-			handleSet();
-		else if (type.equals("signup"))
-			handleSignup();
-		else if (type.equals("forgot"))
-			handleForgot();
+		try {
+			if (type.equals("get"))
+				handleGet();
+			else if (type.equals("set"))
+				handleSet();
+			else if (type.equals("signup"))
+				handleSignup();
+			else if (type.equals("forgot"))
+				handleForgot();
+		} catch (AuthFailedException e) {
+			response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+			fail();
+		}
 	}
 
-	private void checkUser() throws IOException {
+	private void checkUser() throws AuthFailedException {
+		user = null;
 		try {
 			user = new User(username);
 			if (!user.checkPassword(password))
-				throw new Exception();
-		} catch (Exception e) {
-			response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-			throw new IOException("auth failed.");
+				user = null;
+		} catch (EntityNotFoundException e) {
+		} catch (NoSuchAlgorithmException e) {
+		} finally {
+			if (user == null)
+				throw new AuthFailedException("auth failed.");
 		}
-	}
-
-	@Override
-	public void doPost(HttpServletRequest req, HttpServletResponse resp)
-		throws IOException
-	{
-		doGet(req, resp);
 	}
 
 	private void handleSignup() throws IOException {
-		User user;
+		User user = null;
 		try {
 			user = new User(username, password);
 		} catch (NoSuchAlgorithmException e) {
-			throw new IOException();
+			fail();
+			return;
 		}
 		user.store();
-		response.getWriter().print("{\"retval\": 0}");
+		success();
 	}
 
-	private void handleGet() throws IOException {
+	private void handleGet() throws AuthFailedException, IOException {
 		checkUser();
 
 		String addons = user.getAddons();
@@ -91,7 +103,7 @@ public class SiphonServlet extends HttpServlet {
 		response.getWriter().print("{\"retval\": 0, \"alert_message\": null, \"status_message\": \"ok\", \"addons\": " + addons + "}");
 	}
 
-	private void handleSet() throws IOException {
+	private void handleSet() throws AuthFailedException, IOException {
 		checkUser();
 
 		BufferedReader reader = request.getReader();
@@ -102,10 +114,19 @@ public class SiphonServlet extends HttpServlet {
 		user.store();
 
 		log.info("Set: " + addons);
-		response.getWriter().print("{\"retval\": 0}");
+		success();
 	}
 
 	private void handleForgot() throws IOException {
+		// not implemented
+		fail();
+	}
+
+	private void success() throws IOException {
+		response.getWriter().print("{\"retval\": 0}");
+	}
+
+	private void fail() throws IOException {
 		response.getWriter().print("{\"retval\": 1}");
 	}
 }

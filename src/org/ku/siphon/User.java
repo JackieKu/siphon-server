@@ -13,12 +13,12 @@ public class User {
 	private Entity entity;
 
 	public User(String user, String password) throws NoSuchAlgorithmException {
-		entity = new Entity(KeyFactory.createKey(User.class.getName(), user));
+		entity = new Entity(KeyFactory.createKey(User.class.getSimpleName(), user));
 		setPassword(password);
 	}
 
 	public User(String user) throws EntityNotFoundException {
-		entity = datastoreService.get(KeyFactory.createKey(User.class.getName(), user));
+		entity = datastoreService.get(KeyFactory.createKey(User.class.getSimpleName(), user));
 	}
 
 	public boolean checkPassword(String password) throws NoSuchAlgorithmException {
